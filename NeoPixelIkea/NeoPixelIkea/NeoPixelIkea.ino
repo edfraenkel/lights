@@ -43,9 +43,17 @@ void loop() {
       controlA.parse();
     } else if (deviceName == "NeoIkeaB")  {
       controlB.parse();
+    } else if (deviceName == "PING") {
+      String cmd = cr.readCommandName();
+      if (cmd == "END") {
+        _n("[NeoPixelIkea][PONG][OK]");
+      } else {
+        _n("[NeoPixelIkea][ERROR]: Expected END command but got "); _(cmd); _n(" instead.");
+      }
+      cr.gobbleTrailingSpaces();
     } else {
 #if DEBUG
-    _("ERROR: Unknown device "); _(deviceName); _n(".");
+    _("[NeoPixelIkea][ERROR]: Unknown device "); _(deviceName); _n(".");
 #endif
     }
   }

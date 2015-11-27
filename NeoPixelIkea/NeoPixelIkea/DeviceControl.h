@@ -20,7 +20,7 @@ public:
 #endif
     for (int i = 0; i < _maxNumParams; ++i) {
       if (_cr.nextIsCommand()) {
-        _par[i] == -1;
+        _par[i] == 0;
       } else {
         _par[i] = _cr.readInt();
 #if DEBUG
@@ -36,14 +36,14 @@ public:
     }
     _("Command number set to "); _(_command); _n(".");
     String endName = _cr.readCommandName();
-    if (endName != "end") {
+    if (endName != "END") {
       _("[");_(_name);_("][ERROR]: Command doesn't end with [END] but with ["); _(endName); _n("].");
       _command = 0; // Turn the light off due to erroneous command
     } else if (_command == _numCommands) {
       _("[");_(_name);_("][ERROR]: command '"); _(commandName); _n("' not found.");
       _command = 0; // Turn the light off due to erroneous command
     } else {
-      _("["); _(_name); _("[OK]");
+      _("["); _(_name); _n("][OK]");
       _counter = 0;
       _millisStart = millis();
     }
@@ -54,8 +54,8 @@ public:
     switch (_command) {
     case 0: _off(); break;
     case 1: _color(_par[0], _par[1], _par[2]); break;
-    case 2: _colors(_par[0], _par[1]); break;
-    case 3: _carousel(_par[0], _par[1]); break;
+    case 2: _colors(_par[0], _par[1], _par[2]); break;
+    case 3: _carousel(_par[0], _par[1], _par[2], _par[3]); break;
     case 4: _random(_par[0], _par[1]); break;
     }
     _counter += 1; 
@@ -76,9 +76,10 @@ private:
     _strip.show();
   }
 
-  void _colors(unsigned char intensity, long int period) {
+  void _colors(unsigned char intensity, long int period, unsigned int phase) {
     long int t = millis() - _millisStart;
-    unsigned char wheelPos = t * 255 / period;
+    unsigned int wheelPos = period ? (t << 16) / period : 0;
+    wheelPos += phase;
     long int color = _wheel(wheelPos, intensity);
     for (int i = 0; i < _strip.numPixels(); ++i) {
       _strip.setPixelColor(i, color);
@@ -86,52 +87,46 @@ private:
     _strip.show();
   }
 
-  void _carousel(unsigned char intensity, long int period) {
-    long int t = millis() - _millisStart;  
-    unsigned char wheelPos = t * 255 / period;
-    long int color = _wheel(wheelPos, intensity);
+  void _carousel(unsigned char intensity, long int period, unsigned int phase, bool reverseDirection) {
+    long int t = millis() - _millisStart;
+    unsigned int wheelPos = (t << 16) / period;
+    wheelPos += phase;
     for (long int i = 0; i < _strip.numPixels(); ++i) {
-      unsigned char wheelPos = i * 255 / NUM_PIXELS * t * 255 / period;
-      long int color = _wheel(wheelPos, intensity);
+      unsigned int wheelPos2 = wheelPos + (i << 16) / _strip.numPixels();
+      if (reverseDirection) {
+        wheelPos2 = 0xFFFF - wheelPos2;
+      }
+      long int color = _wheel(wheelPos2, intensity);
       _strip.setPixelColor(i, color);
     }
     _strip.show();
   }
 
   void _random(unsigned char intensity, long int period) {
-    long int t = millis() - _millisStart;
-    unsigned char wheelPos = t * 255 / period;
-    long int color = _wheel(wheelPos, intensity);
-    for (long int i = 0; i < _strip.numPixels(); ++i) {
-      unsigned char wheelPos = t * 255 / period + i * 255 / NUM_PIXELS;
-      long int color = _wheel(wheelPos, intensity);
-      _strip.setPixelColor(i, color);
-    }
     _strip.show();
   }
 
-  uint32_t _wheel(unsigned char wheelPos, unsigned char intensity) {
-    wheelPos = 255 - wheelPos;
-    if (wheelPos < 85) {
-      long int r = 255 - wheelPos * 3;
+  uint32_t _wheel(unsigned int wheelPos, unsigned char intensity) {
+    if (wheelPos < 21845) {
+      long int r = 0xFFFF - wheelPos * 3;
       long int b = wheelPos * 3;
-      r *= intensity; r /= 255;
-      b *= intensity; b /= 255;
+      r *= intensity; r >>= 16;
+      b *= intensity; b >>= 16;
       return Adafruit_NeoPixel::Color(r, 0, b);
     }
-    if (wheelPos < 170) {
-      wheelPos -= 85;
+    if (wheelPos < 43690) {
+      wheelPos -= 21845;
       long int g = wheelPos * 3;
-      long int b = 255 - wheelPos * 3;
-      g *= intensity; g /= 255;
-      b *= intensity; b /= 255;
+      long int b = 0xFFFF - wheelPos * 3;
+      g *= intensity; g >>= 16;
+      b *= intensity; b >>= 16;
       return Adafruit_NeoPixel::Color(0, g, b);
     }
-    wheelPos -= 170;
+    wheelPos -= 43690;
     long int r = wheelPos * 3;
-    long int g = 255 - wheelPos * 3;
-    r *= intensity; r /= 255;
-    g *= intensity; g /= 255;
+    long int g = 0xFFFF - wheelPos * 3;
+    r *= intensity; r >>= 16;
+    g *= intensity; g >>= 16;
     return Adafruit_NeoPixel::Color(r, g, 0);
   }
 
